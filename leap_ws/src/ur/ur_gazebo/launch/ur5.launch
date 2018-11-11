@@ -1,0 +1,67 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="limited" default="false"/>
+  <arg name="paused" default="true"/>
+  <arg name="gui" default="true"/>
+  
+  <!-- startup simulated world -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" default="worlds/empty.world"/>
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="gui" value="$(arg gui)"/>
+  </include>
+
+  <!-- send robot urdf to param server -->
+  <!--ur5_upload.launch-->
+  
+  <param unless="$(arg limited)" name="robot_description" command="$(find xacro)/xacro --inorder '$(find ur_description)/urdf/ur5_robot.urdf.xacro'" />
+  <param if="$(arg limited)" name="robot_description" command="$(find xacro)/xacro --inorder '$(find ur_description)/urdf/ur5_joint_limited_robot.urdf.xacro'" />
+  
+  <!-- load the controllers -->
+  <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false" 
+      output="screen" ns="/ur" args="joint_state_controller
+        shoulder_pan_joint_position_controller
+        shoulder_lift_joint_position_controller
+        elbow_joint_position_controller
+        wrist_1_joint_position_controller
+        wrist_2_joint_position_controller
+        wrist_3_joint_position_controller" >
+  </node>
+
+  <!-- push robot_description to factory and spawn robot in gazebo -->
+  <node name="spawn_gazebo_model" pkg="gazebo_ros" type="spawn_model" 
+        args="-urdf -param robot_description -model robot 
+        -z 0.1 -y 0.0 -x -0.5
+        -J shoulder_lift_joint -0.7854
+        -J elbow_joint 0.7854
+        -unpause"
+        respawn="false" output="screen" />
+
+  <!-- Robot state publisher -->
+  <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
+    <param name="publish_frequency" type="double" value="50.0" />
+    <param name="tf_prefix" type="string" value="" />
+    <remap from="/joint_states" to="/ur/joint_states" />
+  </node>
+
+
+  <rosparam file="$(find ur_gazebo)/controller/arm_controller_ur5.yaml" command="load" ns="/ur"/>
+
+  <!-- Inverse Kinematics Node -->
+  <node
+    pkg="ur5ik"
+    type="urik-node"
+    name="urik"
+    required="true"
+    launch-prefix="xterm -e"
+  />
+
+   <!-- Pose Publisher Node -->
+  <node
+    pkg="ur5ik"
+    type="pose_publisher"
+    name="PosePublisher"
+    required="true"
+  />
+  
+</launch>
