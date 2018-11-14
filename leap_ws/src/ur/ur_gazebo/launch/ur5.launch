@@ -44,24 +44,35 @@
     <remap from="/joint_states" to="/ur/joint_states" />
   </node>
 
-
-  <rosparam file="$(find ur_gazebo)/controller/arm_controller_ur5.yaml" command="load" ns="/ur"/>
-
-  <!-- Inverse Kinematics Node -->
-  <node
-    pkg="ur5ik"
-    type="urik-node"
-    name="urik"
-    required="true"
-    launch-prefix="xterm -e"
-  />
-
-   <!-- Pose Publisher Node -->
+  <!-- Pose Publisher Node -->
   <node
     pkg="ur5ik"
     type="pose_publisher"
-    name="PosePublisher"
+    name="tfleap_publisher"
     required="true"
   />
+
+  <rosparam file="$(find ur_gazebo)/controller/arm_controller_ur5.yaml" command="load" ns="/ur"/>
+
+ <!-- Load the listener parameters and start the driver node -->
+  <rosparam file="$(find leap_motion)/config/listener_params.yaml" command="load"/>
+  <node pkg="leap_motion" type="leap_motion_driver_node" name="leap_driver"/>
+    
+  <!-- Start the visualization node and make a tf so ROS and Leap orientations are the same-->
+  <node pkg="leap_motion" type="leap_motion_visualizer_node" name="leap_visualizer" output="screen" />
+  <node pkg="tf" type="static_transform_publisher" name="link1_broadcaster" args="0 0 0 0.707 0 0 0.707 world leap_hands 100" />
+
+  <!-- Load the filter parameters and start the filter node -->
+  <rosparam file="$(find leap_motion)/config/filter_params.yaml" command="load" />
+  <node pkg="leap_motion" type="leap_motion_filter_node" name="leap_filter" output="screen" />
+
+  <group ns="leap_motion">
+    <!-- Start the node that gets raw images from the Leap Motion controller -->
+    <node pkg="leap_motion" type="leap_motion_camera_node" name="leap_camera" output="screen"/>
+
+    <!-- Start the node that generates the pointcloud and a tf to orientate it the right way-->
+    <node pkg="stereo_image_proc" type="stereo_image_proc" name="stereo_image" output="screen"/>
+    <node pkg="tf" type="static_transform_publisher" name="link2_broadcaster" args="0 0 0 0 0 1 0 world leap_pointcloud 100" />
+    </group>
   
 </launch>
